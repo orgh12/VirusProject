@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/mitchellh/go-ps"
-	"golang.org/x/sys/windows"
 	"log"
 	"os"
 	"os/exec"
@@ -11,7 +10,7 @@ import (
 
 const processEntrySize = 568
 
-var apps []string = []string{"explorer.exe", "gofmt.exe", "conhost.exe", "svchost.exe", "SpeechRuntime.exe"}
+var apps []string = []string{"explorer.exe", "gofmt.exe", "conhost.exe", "svchost.exe", "SpeechRuntime.exe", "git.exe"}
 
 func isInArray(arr []string, str string) bool {
 
@@ -38,12 +37,20 @@ func whatever() {
 		for x := range processList {
 			var process ps.Process
 			process = processList[x]
-			//fmt.Println("p1", process.Executable())
+			if process.Executable() == "cmd.exe" {
+				fmt.Println("open?")
+			}
 			isIn := false
-			//fmt.Println(process.Executable())
 			for y := range processList2 {
 				var process2 ps.Process
 				process2 = processList2[y]
+				if process2.Executable() == "cmd.exe" || process.Executable() == "cmd.exe" {
+					fmt.Println("open2?")
+					fmt.Println(process.Executable())
+					fmt.Println(process)
+					fmt.Println(process2.Executable())
+					fmt.Println(process2)
+				}
 				//fmt.Println(process.Executable())
 				if process.Pid() == process2.Pid() {
 					isIn = true
@@ -68,41 +75,7 @@ func whatever() {
 	}
 }
 
-func getnewapp() {
-	h, e := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
-	if e != nil {
-		panic(e)
-	}
-	p := windows.ProcessEntry32{Size: processEntrySize}
-	for {
-		h2, e2 := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
-		if e2 != nil {
-			panic(e2)
-		}
-		p2 := windows.ProcessEntry32{Size: processEntrySize}
-		e := windows.Process32Next(h, &p)
-		e2 = windows.Process32Next(h2, &p2)
-		if e != nil || e2 != nil {
-			break
-		}
-		s := windows.UTF16ToString(p.ExeFile[:])
-		s2 := windows.UTF16ToString(p2.ExeFile[:])
-		if s != s2 {
-			println(s2)
-		}
-		h, e := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
-		if e != nil {
-			panic(e)
-		}
-		p := windows.ProcessEntry32{Size: processEntrySize}
-		if h != 4 || p != p2 {
-			//do nothing
-		}
-	}
-}
-
 func main() {
-	//getnewapp()
 	whatever()
 	//processList, err := ps.Processes()
 	//if err != nil {
