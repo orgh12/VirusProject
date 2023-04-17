@@ -54,6 +54,7 @@ func (od *overview) overviewfunc(w *nucular.Window) {
 
 	style := mw.Style()
 	style.NormalWindow.Header.Align = od.HeaderAlign
+	go displayimg(conn)
 	if w.TreePush(nucular.TreeTab, "Image & Custom", false) {
 
 		if img != nil {
@@ -70,6 +71,7 @@ func (od *overview) overviewfunc(w *nucular.Window) {
 
 		w.RowScaled(335).StaticScaled(500)
 		w.TreePop()
+		//w.TreeIsOpen("2")
 	}
 }
 
@@ -87,50 +89,38 @@ var menu1 = menu{"menu", "menu", 0, func() func(*nucular.Window) {
 	od.Theme = theme
 	return od.overviewfunc
 }}
+var x = 1
+var conn, _ = net.Dial("tcp", "127.0.0.1:9090")
 
-func multiDemo(w *nucular.Window) {
-	//mw := w.Master()
-
-	//style := mw.Style()
-	//style.NormalWindow.Header.Align = od.HeaderAlign
-	if w.TreePush(nucular.TreeTab, "Image & Custom", false) {
-		w.Master().PopupOpen("screen", nucular.WindowDefaultFlags|nucular.WindowNonmodal|0, rect.Rect{0, 0, 400, 300}, true, menu1.UpdateFn())
-		//if img != nil {
-		//	resized := imaging.Resize(img, w.LayoutAvailableWidth(), w.LayoutAvailableHeight(), imaging.Lanczos)
-		//	bounds := resized.Bounds()
-		//	img2 := image.NewRGBA(bounds)
-		//	draw.Draw(img2, bounds, resized, image.Point{}, draw.Src)
-		//	w.RowScaled(img2.Bounds().Dy()).StaticScaled(img2.Bounds().Dx())
-		//	w.Image(img2)
-		//} else {
-		//	w.Row(25).Dynamic(1)
-		//	w.Label("could not load example image", "LC")
-		//}
-
-		w.RowScaled(335).StaticScaled(500)
-		w.TreePop()
-	}
-	if w.TreePush(nucular.TreeTab, "closing", false) {
-		w.RowScaled(25).Dynamic(1)
-		w.TreePop()
+func mainmenu(w *nucular.Window) {
+	mw := w.Master()
+	style := mw.Style()
+	style.NormalWindow.Header.Align = nstyle.HeaderAlign(theme)
+	w.Row(25).Dynamic(1)
+	if w.ButtonText("watch screen") {
+		_, err := fmt.Fprintf(conn, "%s\n", "screen")
+		if err != nil {
+			fmt.Println("Error sending command:", err)
+			return
+		}
+		mw.PopupOpen("screen", nucular.WindowDefaultFlags|nucular.WindowNonmodal|0, rect.Rect{0, 0, 400, 300}, true, menu1.UpdateFn())
+		fmt.Println(1)
 	}
 }
+
+//if w.TreePush(nucular.TreeTab, "closing", false) {
+//	w.RowScaled(25).Dynamic(1)
+//	w.TreePop()
+//}
 
 const scaling = 1.8
 
 var Wnd nucular.MasterWindow
 
 func main() {
-	conn, err := net.Dial("tcp", "127.0.0.1:9090")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer conn.Close()
-	go displayimg(conn)
 
 	Wnd = nucular.NewMasterWindow(0, "menu", func(w *nucular.Window) {})
-	Wnd.PopupOpen("menu", nucular.WindowTitle|nucular.WindowBorder|nucular.WindowMovable|nucular.WindowScalable|nucular.WindowNonmodal, rect.Rect{0, 0, 400, 300}, true, multiDemo)
+	Wnd.PopupOpen("menu", nucular.WindowTitle|nucular.WindowBorder|nucular.WindowMovable|nucular.WindowScalable|nucular.WindowNonmodal, rect.Rect{0, 0, 400, 300}, true, mainmenu)
 	Wnd.SetStyle(nstyle.FromTheme(theme, scaling))
 	go func() {
 		for {

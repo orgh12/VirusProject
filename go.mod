@@ -7,6 +7,7 @@ require (
 	github.com/aarzilli/nucular v0.0.0-20230307021608-c6b69b6535ed
 	github.com/disintegration/imaging v1.6.2
 	github.com/mitchellh/go-ps v1.0.0
+	github.com/vova616/screenshot v0.0.0-20220801010501-56c10359473c
 	golang.org/x/image v0.5.0
 )
 
