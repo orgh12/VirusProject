@@ -267,7 +267,6 @@ func redirect(stopRedirect chan bool) {
 		},
 	})
 
-	fmt.Println("hi")
 	select {
 	case <-stopRedirect:
 		fmt.Println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -275,13 +274,18 @@ func redirect(stopRedirect chan bool) {
 		signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
 		<-signalChannel
 
-		// Clean up
+		//Clean up
 		proxy.Close()
-		// Stop the loop when the stop channel receives a signal
+		//Stop the loop when the stop channel receives a signal
 		fmt.Println("Redirect function stopped")
 		return
 	default:
-
+		go func() {
+			err = proxy.Start()
+			if err != nil {
+				log.Fatal(err)
+			}
+		}()
 	}
 
 }

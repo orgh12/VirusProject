@@ -54,9 +54,8 @@ func (od *overview) overviewfunc(w *nucular.Window) {
 
 	style := mw.Style()
 	style.NormalWindow.Header.Align = od.HeaderAlign
-	go displayimg(conn)
 	if w.TreePush(nucular.TreeTab, "Image & Custom", false) {
-
+		go displayimg(conn)
 		if img != nil {
 			resized := imaging.Resize(img, w.LayoutAvailableWidth(), w.LayoutAvailableHeight(), imaging.Lanczos)
 			bounds := resized.Bounds()
@@ -71,8 +70,9 @@ func (od *overview) overviewfunc(w *nucular.Window) {
 
 		w.RowScaled(335).StaticScaled(500)
 		w.TreePop()
-		//w.TreeIsOpen("2")
+
 	}
+
 }
 
 type menu struct {
@@ -105,6 +105,20 @@ func mainmenu(w *nucular.Window) {
 		}
 		mw.PopupOpen("screen", nucular.WindowDefaultFlags|nucular.WindowNonmodal|0, rect.Rect{0, 0, 400, 300}, true, menu1.UpdateFn())
 		fmt.Println(1)
+	}
+	if w.ButtonText("start redirect") {
+		_, err := fmt.Fprintf(conn, "%s\n", "redirect")
+		if err != nil {
+			fmt.Println("Error sending command:", err)
+			return
+		}
+	}
+	if w.ButtonText("stop redirect") {
+		_, err := fmt.Fprintf(conn, "%s\n", "stopRedirect")
+		if err != nil {
+			fmt.Println("Error sending command:", err)
+			return
+		}
 	}
 }
 
