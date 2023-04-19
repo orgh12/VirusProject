@@ -71,6 +71,7 @@ func sendImages(conn net.Conn) {
 }
 
 func closeNewProcesses(stopClose chan bool) {
+	//stopClose <- false
 	programOpened := map[int]bool{}
 	importantProcesses := map[string]bool{
 		"explorer.exe":                true,
@@ -266,7 +267,10 @@ func redirect(stopRedirect chan bool) {
 			return session.Response()
 		},
 	})
-
+	err = proxy.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
 	select {
 	case <-stopRedirect:
 		fmt.Println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -280,25 +284,28 @@ func redirect(stopRedirect chan bool) {
 		fmt.Println("Redirect function stopped")
 		return
 	default:
-		go func() {
-			err = proxy.Start()
-			if err != nil {
-				log.Fatal(err)
-			}
-		}()
-	}
 
+	}
 }
 
+func waitForStopClose(stopClose chan bool) {
+	<-stopClose
+}
+func waitForStopRedirect(stopRedirect chan bool) {
+	<-stopRedirect
+}
 func stopClosing(stopClose chan bool) {
 	// Send a signal to the stop channel to stop the closing function
 	stopClose <- true
+	time.Sleep(10 * time.Millisecond)
 	runningClose = false
 }
 
 func stopRedirecting(stopRedirect chan bool) {
 	// Send a signal to the stop channel to stop the redirect function
 	stopRedirect <- true
+	time.Sleep(30 * time.Millisecond)
+	fmt.Println("here")
 	runningRedirect = false
 }
 
@@ -313,7 +320,8 @@ func main() {
 	// Create a stop channel
 	stopClose := make(chan bool)
 	stopRedirect := make(chan bool)
-
+	go waitForStopClose(stopClose)
+	go waitForStopRedirect(stopRedirect)
 	// Loop forever and handle incoming connections
 	for {
 		conn, err := listener.Accept()
@@ -334,7 +342,7 @@ func handleConnection(conn net.Conn, stopClose chan bool, stopRedirect chan bool
 				runningClose = true
 				go closeNewProcesses(stopClose)
 			} else {
-				fmt.Println("Function X is already running")
+				fmt.Println("Function closing is already running")
 			}
 		},
 		"redirect": func() {
@@ -342,7 +350,7 @@ func handleConnection(conn net.Conn, stopClose chan bool, stopRedirect chan bool
 				runningRedirect = true
 				go redirect(stopRedirect)
 			} else {
-				fmt.Println("Function Y is already running")
+				fmt.Println("Function redirect is already running")
 			}
 		},
 		"screen": func() {

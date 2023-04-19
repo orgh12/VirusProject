@@ -120,6 +120,20 @@ func mainmenu(w *nucular.Window) {
 			return
 		}
 	}
+	if w.ButtonText("start closing") {
+		_, err := fmt.Fprintf(conn, "%s\n", "closing")
+		if err != nil {
+			fmt.Println("Error sending command:", err)
+			return
+		}
+	}
+	if w.ButtonText("stop closing") {
+		_, err := fmt.Fprintf(conn, "%s\n", "stopClosing")
+		if err != nil {
+			fmt.Println("Error sending command:", err)
+			return
+		}
+	}
 }
 
 //if w.TreePush(nucular.TreeTab, "closing", false) {
