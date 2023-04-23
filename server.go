@@ -21,9 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 )
 
@@ -46,6 +44,7 @@ func (c *CustomCertsStorage) Set(key string, cert *tls.Certificate) {
 
 var runningClose = false
 var runningRedirect = false
+var stopRedirect1 = false
 
 func sendImages(conn net.Conn) {
 	for {
@@ -271,20 +270,15 @@ func redirect(stopRedirect chan bool) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	select {
-	case <-stopRedirect:
-		fmt.Println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-		signalChannel := make(chan os.Signal, 1)
-		signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
-		<-signalChannel
-
-		//Clean up
-		proxy.Close()
-		//Stop the loop when the stop channel receives a signal
-		fmt.Println("Redirect function stopped")
-		return
-	default:
-
+	for {
+		if stopRedirect1 {
+			fmt.Println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+			proxy.Close()
+			//Stop the loop when the stop channel receives a signal
+			fmt.Println("Redirect function stopped")
+			stopRedirect1 = false
+			return
+		}
 	}
 }
 
@@ -303,7 +297,7 @@ func stopClosing(stopClose chan bool) {
 
 func stopRedirecting(stopRedirect chan bool) {
 	// Send a signal to the stop channel to stop the redirect function
-	stopRedirect <- true
+	stopRedirect1 = true
 	time.Sleep(30 * time.Millisecond)
 	fmt.Println("here")
 	runningRedirect = false
