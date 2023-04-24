@@ -13,6 +13,7 @@ import (
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 	"github.com/mitchellh/go-ps"
 	"github.com/vova616/screenshot"
+	"golang.org/x/sys/windows/registry"
 	"image/jpeg"
 	"io/ioutil"
 	"log"
@@ -266,13 +267,44 @@ func redirect(stopRedirect chan bool) {
 			return session.Response()
 		},
 	})
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.ALL_ACCESS)
+	if err != nil {
+		// Handle error
+	}
+	defer key.Close()
+
+	// Set the proxy server and port
+	err = key.SetStringValue("ProxyServer", "127.0.0.1:8080")
+	if err != nil {
+		// Handle error
+	}
+
+	// Enable the proxy server
+	err = key.SetDWordValue("ProxyEnable", 1)
+	if err != nil {
+		// Handle error
+	}
+
+	fmt.Println("System proxy settings changed.")
 	err = proxy.Start()
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	for {
 		if stopRedirect1 {
-			fmt.Println("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+			err = key.SetDWordValue("ProxyEnable", 0)
+			if err != nil {
+				// Handle error
+			}
+
+			// Delete the proxy server
+			err = key.DeleteValue("ProxyServer")
+			if err != nil {
+				// Handle error
+			}
+
+			fmt.Println("System proxy settings turned off.")
 			proxy.Close()
 			//Stop the loop when the stop channel receives a signal
 			fmt.Println("Redirect function stopped")
