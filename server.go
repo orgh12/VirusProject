@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -325,6 +326,7 @@ func stopClosing(stopClose chan bool) {
 	stopClose <- true
 	time.Sleep(10 * time.Millisecond)
 	runningClose = false
+	return
 }
 
 func stopRedirecting(stopRedirect chan bool) {
@@ -333,11 +335,12 @@ func stopRedirecting(stopRedirect chan bool) {
 	time.Sleep(30 * time.Millisecond)
 	fmt.Println("here")
 	runningRedirect = false
+	return
 }
 
 func main() {
 	// Start listening on port 9090
-	listener, err := net.Listen("tcp", "localhost:9090")
+	listener, err := net.Listen("tcp", "127.0.0.1:9090")
 	if err != nil {
 		panic(err)
 	}
@@ -362,8 +365,8 @@ func handleConnection(conn net.Conn, stopClose chan bool, stopRedirect chan bool
 	defer conn.Close()
 
 	// Create a map of commands to functions
-	commands := map[string]func(){
-		"closing": func() {
+	commands := map[string]func(args ...string){
+		"closing": func(args ...string) {
 			if !runningClose {
 				runningClose = true
 				go closeNewProcesses(stopClose)
@@ -371,7 +374,7 @@ func handleConnection(conn net.Conn, stopClose chan bool, stopRedirect chan bool
 				fmt.Println("Function closing is already running")
 			}
 		},
-		"redirect": func() {
+		"redirect": func(args ...string) {
 			if !runningRedirect {
 				runningRedirect = true
 				go redirect(stopRedirect)
@@ -379,21 +382,51 @@ func handleConnection(conn net.Conn, stopClose chan bool, stopRedirect chan bool
 				fmt.Println("Function redirect is already running")
 			}
 		},
-		"screen": func() {
+		"screen": func(args ...string) {
 			go sendImages(conn)
 		},
-		"stopClosing":  func() { stopClosing(stopClose) },
-		"stopRedirect": func() { stopRedirecting(stopRedirect) },
+		"stopClosing":  func(args ...string) { stopClosing(stopClose) },
+		"stopRedirect": func(args ...string) { stopRedirecting(stopRedirect) },
 	}
-
 	// Read commands from the client and execute the corresponding function
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
+		if !scanner.Scan() {
+			// Error reading from connection, assuming connection closed
+			fmt.Println("Connection closed by client.")
+			break
+		}
 		command := scanner.Text()
-		if function, ok := commands[command]; ok {
-			function()
+		args := strings.Split(command, ",")
+		fmt.Println(command)
+		fmt.Println(args)
+		if function, ok := commands[args[0]]; ok {
+			function(args[1:]...)
 		} else {
 			fmt.Println("Unknown command:", command)
 		}
 	}
+	stopClosing(stopClose)
+	stopRedirecting(stopRedirect)
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.ALL_ACCESS)
+	if err != nil {
+		// Handle error
+	}
+	defer key.Close()
+
+	fmt.Println("System proxy settings changed.")
+	// Client connection was closed
+	fmt.Println("Connection closed by client.")
+	err = key.SetDWordValue("ProxyEnable", 0)
+	if err != nil {
+		// Handle error
+	}
+
+	// Delete the proxy server
+	err = key.DeleteValue("ProxyServer")
+	if err != nil {
+		// Handle error
+	}
+
+	fmt.Println("System proxy settings turned off.")
 }
