@@ -49,7 +49,7 @@ type overview struct {
 	Theme       nstyle.Theme
 }
 
-func (od *overview) overviewfunc(w *nucular.Window) {
+func (od *overview) screenfunc(w *nucular.Window) {
 	mw := w.Master()
 
 	style := mw.Style()
@@ -65,13 +65,90 @@ func (od *overview) overviewfunc(w *nucular.Window) {
 			w.Image(img2)
 		} else {
 			w.Row(25).Dynamic(1)
-			w.Label("could not load example image", "LC")
+			w.Label("could not load image", "LC")
 		}
 
 		w.RowScaled(335).StaticScaled(500)
 		w.TreePop()
 
 	}
+
+}
+
+var times = 0
+
+func textEditorDemo() func(w *nucular.Window) {
+	var source nucular.TextEditor
+	source.Flags = nucular.EditSelectable | nucular.EditClipboard
+	source.Buffer = []rune("source")
+	var dest nucular.TextEditor
+	dest.Flags = nucular.EditSelectable | nucular.EditClipboard
+	dest.Buffer = []rune("dest")
+
+	return func(w *nucular.Window) {
+		w.Row(30).Dynamic(1)
+		source.Maxlen = 100
+		source.Edit(w)
+		w.Row(30).Dynamic(1)
+		dest.Maxlen = 100
+		dest.Edit(w)
+		if w.ButtonText("start redirect") {
+			//in case other redirect option was selected first and changed into this - prevents needing to press the close redirect every time
+			if times > 0 {
+				_, err := fmt.Fprintf(conn, "%s\n", "stopRedirect")
+				if err != nil {
+					fmt.Println("Error sending command:", err)
+					return
+				}
+			}
+
+			times += 1
+			_, err := fmt.Fprintf(conn, "%s%s%s%s\n", "redirect ", string(source.Buffer), " ", string(dest.Buffer))
+			if err != nil {
+				fmt.Println("Error sending command:", err)
+			}
+			fmt.Println("sentt")
+		}
+		if w.ButtonText("redirect all sites into dest") {
+			//in case other redirect option was selected first and changed into this - prevents needing to press the close redirect every time
+			if times > 0 {
+				_, err := fmt.Fprintf(conn, "%s\n", "stopRedirect")
+				if err != nil {
+					fmt.Println("Error sending command:", err)
+					return
+				}
+			}
+
+			times += 1
+			_, err := fmt.Fprintf(conn, "%s%s%s\n", "redirect ", "all ", string(dest.Buffer))
+			if err != nil {
+				fmt.Println("Error sending command:", err)
+				return
+			}
+		}
+		if w.ButtonText("stop redirect") {
+			times = 0
+			_, err := fmt.Fprintf(conn, "%s\n", "stopRedirect")
+			if err != nil {
+				fmt.Println("Error sending command:", err)
+				return
+			}
+		}
+	}
+}
+
+func (od *overview) redirectfunc(w *nucular.Window) {
+	mw := w.Master()
+
+	style := mw.Style()
+	style.NormalWindow.Header.Align = od.HeaderAlign
+	w.Row(20).Dynamic(1)
+	var source nucular.TextEditor
+	source.Flags = nucular.EditSelectable
+	source.Buffer = []rune("source")
+	source.Maxlen = 30
+	source.Edit(w)
+	w.Row(20).Dynamic(1)
 
 }
 
@@ -84,11 +161,20 @@ type menu struct {
 
 var theme nstyle.Theme = nstyle.DarkTheme
 
-var menu1 = menu{"menu", "menu", 0, func() func(*nucular.Window) {
+var menuscreen = menu{"menu", "menu", 0, func() func(*nucular.Window) {
 	od := &overview{}
 	od.Theme = theme
-	return od.overviewfunc
+	od.HeaderAlign = nstyle.HeaderLeft
+	return od.screenfunc
 }}
+
+var menuredirect = menu{"menu", "menu", 0, func() func(*nucular.Window) {
+	od := &overview{}
+	od.Theme = theme
+	od.HeaderAlign = nstyle.HeaderRight
+	return od.redirectfunc
+}}
+
 var x = 1
 var conn, _ = net.Dial("tcp", "127.0.0.1:9090")
 
@@ -99,27 +185,19 @@ func mainmenu(w *nucular.Window) {
 	w.Row(25).Dynamic(1)
 	if w.ButtonText("watch screen") {
 		_, err := fmt.Fprintf(conn, "%s\n", "screen")
+		fmt.Println("sent screen")
 		if err != nil {
 			fmt.Println("Error sending command:", err)
 			return
 		}
-		mw.PopupOpen("screen", nucular.WindowDefaultFlags|nucular.WindowNonmodal|0, rect.Rect{0, 0, 400, 300}, true, menu1.UpdateFn())
+		mw.PopupOpen("screen", nucular.WindowDefaultFlags|nucular.WindowNonmodal|0, rect.Rect{0, 0, 400, 300}, true, menuscreen.UpdateFn())
 		fmt.Println(1)
 	}
-	if w.ButtonText("start redirect") {
-		_, err := fmt.Fprintf(conn, "%s\n", "redirect")
-		if err != nil {
-			fmt.Println("Error sending command:", err)
-			return
-		}
+	if w.ButtonText("enter redirect menu") {
+		mw.PopupOpen("redirect", nucular.WindowDefaultFlags|nucular.WindowNonmodal|0, rect.Rect{0, 0, 400, 300}, true, textEditorDemo())
+
 	}
-	if w.ButtonText("stop redirect") {
-		_, err := fmt.Fprintf(conn, "%s\n", "stopRedirect")
-		if err != nil {
-			fmt.Println("Error sending command:", err)
-			return
-		}
-	}
+
 	if w.ButtonText("start closing") {
 		_, err := fmt.Fprintf(conn, "%s\n", "closing")
 		if err != nil {

