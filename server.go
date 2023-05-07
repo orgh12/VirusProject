@@ -350,7 +350,7 @@ func waitForStopClose(stopClose chan bool) {
 
 func main() {
 	// Start listening on port 9090
-	listener, err := net.Listen("tcp", "127.0.0.1:9090")
+	listener, err := net.Listen("tcp", "0.0.0.0:9090")
 	if err != nil {
 		panic(err)
 	}
