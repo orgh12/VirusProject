@@ -80,39 +80,40 @@ func (od *overview) screenfunc(w *nucular.Window) {
 var times = 0
 
 func sendCrt() {
-	certFile := "demo.crt"
-	keyFile := "demo.key"
-
-	cert, err := os.Open(certFile)
+	conn2, err := net.Dial("tcp", ip+":12345")
 	if err != nil {
-		fmt.Println("Failed to open certificate file:", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
-	defer cert.Close()
-
-	key, err := os.Open(keyFile)
+	defer conn2.Close()
+	conn3, err := net.Dial("tcp", ip+":12346")
 	if err != nil {
-		fmt.Println("Failed to open key file:", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
-	defer key.Close()
-	buffer2 := make([]byte, 1024)
-
-	// Send certificate file
-	_, err = io.CopyBuffer(conn, cert, buffer2)
+	defer conn3.Close()
+	crtFile, err := os.Open("demo.crt")
 	if err != nil {
-		fmt.Println("Failed to send certificate file:", err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
+	defer crtFile.Close()
 
-	// Send key file
-	_, err = io.CopyBuffer(conn, key, buffer2)
+	keyFile, err := os.Open("demo.key")
 	if err != nil {
-		fmt.Println("Failed to send key file:", err)
-		os.Exit(1)
+		log.Fatal(err)
+	}
+	defer keyFile.Close()
+
+	_, err = io.Copy(conn2, crtFile)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	fmt.Println("Files transferred successfully!")
+	// Transfer the key file
+	_, err = io.Copy(conn3, keyFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("File transfer completed!")
 }
 
 func redirectmenu() func(w *nucular.Window) {
@@ -173,12 +174,12 @@ func redirectmenu() func(w *nucular.Window) {
 			}
 		}
 		if w.ButtonText("send certificate") {
-			sendCrt()
 			_, err := fmt.Fprintf(conn, "%s\n", "receiveCert")
 			if err != nil {
 				fmt.Println("Error sending command:", err)
 				return
 			}
+			sendCrt()
 		}
 	}
 }
@@ -220,9 +221,8 @@ var menuredirect = menu{"menu", "menu", 0, func() func(*nucular.Window) {
 	od.HeaderAlign = nstyle.HeaderRight
 	return od.redirectfunc
 }}
-
-var x = 1
-var conn, _ = net.Dial("tcp", "192.168.172.110:9090")
+var ip = "192.168.172.110"
+var conn, _ = net.Dial("tcp", ip+":9090")
 
 func mainmenu(w *nucular.Window) {
 	mw := w.Master()
