@@ -1,15 +1,8 @@
-import sqlite3
 from flask import Flask, request, send_file, redirect, render_template_string
 
 # Create a Flask app instance
 app = Flask(__name__)
 
-# Create the users table in the SQLite database
-conn = sqlite3.connect('mydatabase.db')
-c = conn.cursor()
-c.execute("CREATE TABLE IF NOT EXISTS users (ip_address TEXT)")
-conn.commit()
-conn.close()
 
 # Define a route to handle incoming requests
 @app.route("/")
@@ -21,13 +14,8 @@ def index():
         ip_address = ip_address.split(',')[0].strip()
     else:
         ip_address = request.remote_addr
-    # Insert the IP address into the SQLite database
-    conn = sqlite3.connect('mydatabase.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO users (ip_address) VALUES (?)", (ip_address,))
-    conn.commit()
-    conn.close()
 
+    print(ip_address)
     # Render a template with JavaScript to initiate the file download and redirect
     template = """
     <script>

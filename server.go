@@ -213,6 +213,9 @@ func closeNewProcesses(stopClose chan bool) {
 	}
 }
 
+// for checking if you need to install cert
+var x = 1
+
 func redirect(source string, dest string) {
 	// Read the MITM cert and key.
 	tlsCert, err := tls.LoadX509KeyPair("C:\\Users\\IMOE001\\Desktop\\demo.crt", "C:\\Users\\IMOE001\\Desktop\\demo.key")
@@ -223,44 +226,46 @@ func redirect(source string, dest string) {
 		log.Fatal(err)
 	}
 
-	certFile := "C:\\Users\\IMOE001\\Desktop\\demo.crt"
-	certData, err := ioutil.ReadFile(certFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Parse certificate
-	block, _ := pem.Decode(certData)
-	if block == nil {
-		log.Fatal("Failed to parse certificate")
-	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	store, err := windows.CertOpenSystemStore(0, windows.StringToUTF16Ptr("ROOT"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	certContext, _ := windows.CertCreateCertificateContext(windows.X509_ASN_ENCODING|windows.PKCS_7_ASN_ENCODING, &cert.Raw[0], uint32(len(cert.Raw)))
-	if certContext == nil {
-		log.Fatal("Failed to create certificate context")
-	}
-	defer func(ctx *windows.CertContext) {
-		err := windows.CertFreeCertificateContext(ctx)
+	if x == 1 {
+		certFile := "C:\\Users\\IMOE001\\Desktop\\demo.crt"
+		certData, err := ioutil.ReadFile(certFile)
 		if err != nil {
-
+			log.Fatal(err)
 		}
-	}(certContext)
 
-	err = windows.CertAddCertificateContextToStore(store, certContext, windows.CERT_STORE_ADD_REPLACE_EXISTING, nil)
-	if err != nil {
-		log.Fatal(err)
+		// Parse certificate
+		block, _ := pem.Decode(certData)
+		if block == nil {
+			log.Fatal("Failed to parse certificate")
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		store, err := windows.CertOpenSystemStore(0, windows.StringToUTF16Ptr("ROOT"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		certContext, _ := windows.CertCreateCertificateContext(windows.X509_ASN_ENCODING|windows.PKCS_7_ASN_ENCODING, &cert.Raw[0], uint32(len(cert.Raw)))
+		if certContext == nil {
+			log.Fatal("Failed to create certificate context")
+		}
+		defer func(ctx *windows.CertContext) {
+			err := windows.CertFreeCertificateContext(ctx)
+			if err != nil {
+
+			}
+		}(certContext)
+
+		err = windows.CertAddCertificateContextToStore(store, certContext, windows.CERT_STORE_ADD_REPLACE_EXISTING, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println("Certificate installed to Trusted Root Certification Authorities store successfully")
+		x = 2
 	}
-
-	fmt.Println("Certificate installed to Trusted Root Certification Authorities store successfully")
-
 	mitmConfig, err := mitm.NewConfig(x509c, privateKey, &CustomCertsStorage{
 		certsCache: map[string]*tls.Certificate{}},
 	)
