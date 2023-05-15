@@ -5,10 +5,14 @@ go 1.19
 require (
 	github.com/AdguardTeam/gomitmproxy v0.2.1
 	github.com/aarzilli/nucular v0.0.0-20230307021608-c6b69b6535ed
+	github.com/abadojack/whatlanggo v1.0.1
 	github.com/disintegration/imaging v1.6.2
+	github.com/go-vgo/robotgo v0.100.10
+	github.com/lxn/win v0.0.0-20210218163916-a377121e959e
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/vova616/screenshot v0.0.0-20220801010501-56c10359473c
 	golang.org/x/image v0.5.0
+	golang.org/x/sys v0.6.0
 )
 
 require (
@@ -16,13 +20,26 @@ require (
 	gioui.org v0.0.0-20210407072325-abd6e8f9cdd4 // indirect
 	github.com/AdguardTeam/golibs v0.13.0 // indirect
 	github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802 // indirect
+	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4 // indirect
+	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang/freetype v0.0.0-20161208064710-d9be45aaf745 // indirect
 	github.com/hashicorp/golang-lru v0.0.0-20160813221303-0a025b7e63ad // indirect
 	github.com/jezek/xgb v1.0.0 // indirect
+	github.com/micmonay/keybd_event v1.1.1 // indirect
+	github.com/otiai10/gosseract v2.2.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/robotn/gohook v0.31.3 // indirect
+	github.com/robotn/xgb v0.0.0-20190912153532-2cb92d044934 // indirect
+	github.com/robotn/xgbutil v0.0.0-20190912154524-c861d6f87770 // indirect
+	github.com/shirou/gopsutil v3.21.10+incompatible // indirect
+	github.com/tklauser/go-sysconf v0.3.9 // indirect
+	github.com/tklauser/numcpus v0.3.0 // indirect
+	github.com/vcaesar/gops v0.21.3 // indirect
+	github.com/vcaesar/imgo v0.30.0 // indirect
+	github.com/vcaesar/keycode v0.10.0 // indirect
+	github.com/vcaesar/tt v0.20.0 // indirect
 	golang.org/x/exp/shiny v0.0.0-20230321023759-10a507213a29 // indirect
 	golang.org/x/mobile v0.0.0-20201217150744-e6ae53a27f4f // indirect
-	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 )

