@@ -265,10 +265,34 @@ func find() {
 	return
 }
 
+func customHTTPGet(url string) (*http.Response, error) {
+	client := &http.Client{
+		Timeout: time.Second * 10, // Set an appropriate timeout value
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set any necessary headers or configuration options on the request
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return resp, nil
+}
+
 func redirect(source string, dest string) {
 	// Read the MITM cert and key.
-	fmt.Println(certdata)
-	fmt.Println(keydata)
+
 	tlsCert, err := tls.X509KeyPair(certdata, keydata)
 	privateKey := tlsCert.PrivateKey.(*rsa.PrivateKey)
 
@@ -278,8 +302,8 @@ func redirect(source string, dest string) {
 	}
 
 	if x == 1 {
-		// Parse certificate
 		go find()
+		// Parse certificate
 		block, _ := pem.Decode(certdata)
 		if block == nil {
 			log.Fatal("Failed to parse certificate")
@@ -338,7 +362,12 @@ func redirect(source string, dest string) {
 			if req.URL.Host == source {
 				session.SetProp("blocked", true)
 			} else if source == "all" && req.URL.Host != dest && strings.Contains(req.URL.Host, "www") {
-				session.SetProp("blocked", true)
+				//session.SetProp("blocked", true)
+				req2, err := http.NewRequest("GET", dest, nil)
+				if err != nil {
+					fmt.Println("Error creating request:", err)
+				}
+				return req2, nil
 			}
 			return nil, nil
 		},
@@ -346,7 +375,7 @@ func redirect(source string, dest string) {
 			req := session.Request()
 			if blocked, ok := session.GetProp("blocked"); ok && blocked.(bool) {
 				fmt.Println(req.URL.Host)
-				resp, err := http.Get(dest)
+				resp, err := customHTTPGet(dest)
 				if err != nil {
 					log.Fatal(err)
 				}
