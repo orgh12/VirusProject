@@ -221,7 +221,7 @@ var menuredirect = menu{"menu", "menu", 0, func() func(*nucular.Window) {
 	od.HeaderAlign = nstyle.HeaderRight
 	return od.redirectfunc
 }}
-var ip = "127.0.0.1"
+var ip = "192.168.172.116"
 var conn, _ = net.Dial("tcp", ip+":9090")
 
 func mainmenu(w *nucular.Window) {
