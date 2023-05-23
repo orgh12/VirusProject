@@ -9,8 +9,8 @@ import (
 	_ "github.com/aarzilli/nucular/style"
 	nstyle "github.com/aarzilli/nucular/style"
 	"github.com/disintegration/imaging"
-	"golang.org/x/image/draw"
 	"image"
+	"image/draw"
 	"image/jpeg"
 	"io"
 	"log"
@@ -23,6 +23,7 @@ import (
 
 var img image.Image
 
+// decode the images and save them to a var to then be displayed
 func displayimg(conn net.Conn) {
 
 	for {
@@ -46,6 +47,7 @@ func displayimg(conn net.Conn) {
 	}
 }
 
+// a struct to use for the gui
 type overview struct {
 	HeaderAlign nstyle.HeaderAlign
 	Theme       nstyle.Theme
@@ -56,9 +58,10 @@ func (od *overview) screenfunc(w *nucular.Window) {
 
 	style := mw.Style()
 	style.NormalWindow.Header.Align = od.HeaderAlign
-	if w.TreePush(nucular.TreeTab, "Image & Custom", false) {
+	if w.TreePush(nucular.TreeTab, "Watch screen", false) {
 		go displayimg(conn)
 		if img != nil {
+			//resize the image to fit the screen
 			resized := imaging.Resize(img, w.LayoutAvailableWidth(), w.LayoutAvailableHeight(), imaging.Lanczos)
 			bounds := resized.Bounds()
 			img2 := image.NewRGBA(bounds)

