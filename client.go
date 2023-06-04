@@ -12,10 +12,8 @@ import (
 	"image"
 	"image/draw"
 	"image/jpeg"
-	"io"
 	"log"
 	"net"
-	"os"
 	_ "runtime/pprof"
 	_ "runtime/trace"
 	"time"
@@ -82,43 +80,6 @@ func (od *overview) screenfunc(w *nucular.Window) {
 
 var times = 0
 
-func sendCrt() {
-	conn2, err := net.Dial("tcp", ip+":12345")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn2.Close()
-	conn3, err := net.Dial("tcp", ip+":12346")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn3.Close()
-	crtFile, err := os.Open("demo.crt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer crtFile.Close()
-
-	keyFile, err := os.Open("demo.key")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer keyFile.Close()
-
-	_, err = io.Copy(conn2, crtFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Transfer the key file
-	_, err = io.Copy(conn3, keyFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println("File transfer completed!")
-}
-
 func redirectmenu() func(w *nucular.Window) {
 	var source nucular.TextEditor
 	source.Flags = nucular.EditSelectable | nucular.EditClipboard
@@ -143,15 +104,14 @@ func redirectmenu() func(w *nucular.Window) {
 					return
 				}
 			}
-
-			times += 1
+			time.Sleep(10 * time.Millisecond)
+			times = 1
 			_, err := fmt.Fprintf(conn, "%s%s%s%s\n", "redirect ", string(source.Buffer), " ", string(dest.Buffer))
 			if err != nil {
 				fmt.Println("Error sending command:", err)
 			}
-			fmt.Println("sentt")
 		}
-		if w.ButtonText("redirect all sites into dest") {
+		if w.ButtonText("block all sites") {
 			//in case other redirect option was selected first and changed into this - prevents needing to press the close redirect every time
 			if times > 0 {
 				_, err := fmt.Fprintf(conn, "%s\n", "stopRedirect")
@@ -160,8 +120,8 @@ func redirectmenu() func(w *nucular.Window) {
 					return
 				}
 			}
-
-			times += 1
+			time.Sleep(10 * time.Millisecond)
+			times = 1
 			_, err := fmt.Fprintf(conn, "%s%s%s\n", "redirect ", "all ", string(dest.Buffer))
 			if err != nil {
 				fmt.Println("Error sending command:", err)
@@ -176,30 +136,7 @@ func redirectmenu() func(w *nucular.Window) {
 				return
 			}
 		}
-		if w.ButtonText("send certificate") {
-			_, err := fmt.Fprintf(conn, "%s\n", "receiveCert")
-			if err != nil {
-				fmt.Println("Error sending command:", err)
-				return
-			}
-			sendCrt()
-		}
 	}
-}
-
-func (od *overview) redirectfunc(w *nucular.Window) {
-	mw := w.Master()
-
-	style := mw.Style()
-	style.NormalWindow.Header.Align = od.HeaderAlign
-	w.Row(20).Dynamic(1)
-	var source nucular.TextEditor
-	source.Flags = nucular.EditSelectable
-	source.Buffer = []rune("source")
-	source.Maxlen = 30
-	source.Edit(w)
-	w.Row(20).Dynamic(1)
-
 }
 
 type menu struct {
@@ -218,13 +155,7 @@ var menuscreen = menu{"menu", "menu", 0, func() func(*nucular.Window) {
 	return od.screenfunc
 }}
 
-var menuredirect = menu{"menu", "menu", 0, func() func(*nucular.Window) {
-	od := &overview{}
-	od.Theme = theme
-	od.HeaderAlign = nstyle.HeaderRight
-	return od.redirectfunc
-}}
-var ip = "192.168.172.116"
+var ip = "127.0.0.1"
 var conn, _ = net.Dial("tcp", ip+":9090")
 
 func mainmenu(w *nucular.Window) {
@@ -234,7 +165,6 @@ func mainmenu(w *nucular.Window) {
 	w.Row(25).Dynamic(1)
 	if w.ButtonText("watch screen") {
 		_, err := fmt.Fprintf(conn, "%s\n", "screen")
-		fmt.Println("sent screen")
 		if err != nil {
 			fmt.Println("Error sending command:", err)
 			return
@@ -263,11 +193,6 @@ func mainmenu(w *nucular.Window) {
 	}
 }
 
-//if w.TreePush(nucular.TreeTab, "closing", false) {
-//	w.RowScaled(25).Dynamic(1)
-//	w.TreePop()
-//}
-
 const scaling = 1.8
 
 var Wnd nucular.MasterWindow
@@ -285,23 +210,4 @@ func main() {
 	}()
 	Wnd.Main()
 
-	//wnd.SetStyle(style.FromTheme(style.DarkTheme, 2.0))
-	//wnd.Main()
-
 }
-
-//func updatefn(w *nucular.Window) {
-//	if w.TreePush(nucular.TreeTab, "Image & Custom", false) {
-//
-//		if img3 != nil {
-//			w.RowScaled(img3.Bounds().Dy()).StaticScaled(img3.Bounds().Dx())
-//			w.Image(img3)
-//		} else {
-//			w.Row(25).Dynamic(1)
-//			w.Label("could not load example image", "LC")
-//		}
-//
-//		w.RowScaled(335).StaticScaled(500)
-//		w.TreePop()
-//	}
-//}
