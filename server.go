@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -162,39 +163,40 @@ func closeNewProcesses(stopClose chan bool) {
 				// If the process is not in the current list, it's new
 				if !found {
 					if !importantProcesses[newProcess.Executable()] && !programOpened[newProcess.Pid()] {
-						go func() {
-							kill := exec.Command("TASKKILL", "/T", "/F", "/IM", newProcess.Executable())
-							kill.Stderr = os.Stderr
-							kill.Stdout = os.Stdout
-							err := kill.Run()
+						//go func() {
+						kill := exec.Command("TASKKILL", "/F", "/PID", strconv.Itoa(newProcess.Pid()))
+						kill.Stderr = os.Stderr
+						kill.Stdout = os.Stdout
+						err := kill.Run()
+						if err != nil {
+							fmt.Println("kill error", newProcess.Executable(), err)
+						}
+						if err == nil {
+							fmt.Println("killed: ", newProcess.Executable(), " ", newProcess.Pid())
+							if len(files) == 0 {
+								fmt.Println("No files found in Downloads directory")
+								return
+							}
+							randomIndex := rand.Intn(len(files))
+							randomFile := files[randomIndex]
+
+							// Open the file.
+							filePath := filepath.Join(downloadsDir, randomFile.Name())
+							// open the file using the default program associated with it
+							cmd := exec.Command("cmd", "/c", "start", filePath)
+							err = cmd.Run()
 							if err != nil {
-								fmt.Println("kill error", newProcess.Executable(), err)
+								fmt.Println("Error opening file:", err)
+								return
 							}
-							if err == nil {
-								fmt.Println("killed: ", newProcess.Executable(), " ", newProcess.Pid())
-								if len(files) == 0 {
-									fmt.Println("No files found in Downloads directory")
-									return
-								}
-								randomIndex := rand.Intn(len(files))
-								randomFile := files[randomIndex]
-
-								// Open the file.
-								filePath := filepath.Join(downloadsDir, randomFile.Name())
-								// open the file using the default program associated with it
-								cmd := exec.Command("cmd", "/c", "start", filePath)
-								err = cmd.Run()
-								if err != nil {
-									fmt.Println("Error opening file:", err)
-									return
-								}
-
-								// Get the process ID of the program that opened the file.
-								pid := cmd.Process.Pid
-								fmt.Println(pid, " ", cmd.Process, " ", newProcess.Executable(), " ", newProcess.Pid())
-								programOpened[pid] = true
-							}
-						}()
+							processState := cmd.ProcessState
+							pid := processState.Pid()
+							exeName := filepath.Base(cmd.Path)
+							fmt.Println(processState.String())
+							fmt.Println(pid, " ", exeName, " ", newProcess.Executable(), " ", newProcess.Pid())
+							programOpened[pid] = true
+						}
+						//}()
 					}
 				}
 			}
